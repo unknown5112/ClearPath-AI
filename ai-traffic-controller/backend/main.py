@@ -6,6 +6,14 @@ import numpy as np
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Sabhi websites ko allow karega
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # Load the trained YOLOv8 model
 model = YOLO("best.pt")
 
