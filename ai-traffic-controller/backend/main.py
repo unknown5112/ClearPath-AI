@@ -1,56 +1,60 @@
 from fastapi import FastAPI, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse
 from ultralytics import YOLO
 import cv2
 import numpy as np
 
 app = FastAPI()
 
-# Vercel aur kisi bhi frontend ko backend se baat karne ki permission
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Sabhi websites ko allow karega
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Apna train kiya hua model load kar
+# Load the trained YOLOv8 model
 model = YOLO("best.pt")
 
 @app.get("/")
-def home():
-    return {"message": "AI Vision Backend is Running on Render!"}
+def read_root():
+    return FileResponse("../frontend/index.html")
 
 @app.post("/detect")
-async def detect(file: UploadFile = File(...)):
-    try:
-        # Image read karna
-        contents = await file.read()
-        nparr = np.frombuffer(contents, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+async def detect_emergency(file: UploadFile = File(...)):
+    # Read frame directly in memory (RAM) for low-latency processing
+    contents = await file.read()
+    nparr = np.frombuffer(contents, np.uint8)
+    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        # YOLO AI se prediction karwana
-        results = model(img)
-        
-        # Detections ko JSON format mein pack karna
-        detections = []
-        for r in results:
-            boxes = r.boxes
-            for box in boxes:
-                x1, y1, x2, y2 = box.xyxy[0].tolist()
-                conf = float(box.conf[0])
-                cls = int(box.cls[0])
-                name = model.names[cls]
-                
-                detections.append({
-                    "class_name": name,
-                    "confidence": round(conf, 2),
-                    "box": [x1, y1, x2, y2]
-                })
+    if frame is None:
+        return {"emergency_detected": False, "boxes": []}
 
-        return JSONResponse(content={"detections": detections})
-    
-    except Exception as e:
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+    h, w, _ = frame.shape
+
+    # Run YOLOv8 inference on the frame
+    results = model.predict(frame, verbose=False)
+
+    boxes_list = []
+    emergency_detected = False
+
+    for box in results[0].boxes:
+        class_id = int(box.cls[0])
+        class_name = model.names[class_id].lower()
+        confidence = float(box.conf[0])
+
+        # Verify if the detected object is an emergency vehicle above the confidence threshold
+        if ("emergency" in class_name or "ambulance" in class_name or "fire" in class_name or "police" in class_name) and confidence > 0.68:
+            emergency_detected = True
+            x1, y1, x2, y2 = box.xyxy[0].tolist()
+            
+            # Normalize coordinates (0 to 1) for responsive rendering across all screen sizes
+            boxes_list.append({
+                "x1": x1 / w,
+                "y1": y1 / h,
+                "x2": x2 / w,
+                "y2": y2 / h,
+                "confidence": round(confidence * 100),
+                "label": "EMERGENCY VEHICLE"
+            })
+
+    if emergency_detected:
+        print(f"🚨 Detected {len(boxes_list)} Emergency Vehicle(s)!")
+
+    return {
+        "emergency_detected": emergency_detected,
+        "boxes": boxes_list
+    }
