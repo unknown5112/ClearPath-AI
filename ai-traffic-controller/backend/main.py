@@ -13,7 +13,7 @@ app = modal.App("clearpath-ai-backend")
 image = (
     modal.Image.debian_slim()
     .pip_install("fastapi", "uvicorn", "ultralytics", "opencv-python-headless", "python-multipart")
-    .apt_install("wget")
+    .apt_install("wget", "libgl1", "libglib2.0-0")
     .run_commands("wget https://raw.githubusercontent.com/unknown5112/ClearPath-AI/main/ai-traffic-controller/backend/best.pt")
 )
 
