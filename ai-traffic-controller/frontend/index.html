@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClearPath AI | Smart Traffic Command Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse-fast {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        .siren-flash {
+            animation: pulse-fast 0.6s infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans selection:bg-emerald-500 selection:text-black">
+
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></div>
+                <h1 class="text-xl md:text-2xl font-extrabold tracking-wider bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                    CLEARPATH AI
+                </h1>
+                <span class="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full border border-slate-700 hidden sm:inline-block">
+                    YOLOv8 Live Vision
+                </span>
+            </div>
+
+            <!-- Siren Audio Master Controls -->
+            <div class="flex items-center gap-3">
+                <div id="sirenActiveBadge" class="hidden items-center gap-2 bg-red-600/20 border border-red-500 text-red-400 px-3 py-1.5 rounded-lg text-xs font-bold siren-flash">
+                    <span>🔊 SIREN WAILING</span>
+                </div>
+                <button id="sirenToggleBtn" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition shadow-lg shadow-emerald-900/30">
+                    <span id="sirenIcon">🔔</span>
+                    <span id="sirenBtnText">Siren: ON</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Dashboard Grid -->
+    <main class="max-w-7xl mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+        <!-- Left / Center Column: Vision Feed & Controls (2 Cols Wide on Desktop) -->
+        <div class="lg:col-span-2 flex flex-col gap-6">
+
+            <!-- Mode Selector Tabs -->
+            <div class="bg-slate-900 p-1.5 rounded-xl border border-slate-800 grid grid-cols-2 gap-2">
+                <button id="tabUpload" class="py-2.5 px-4 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 bg-blue-600 text-white shadow-lg">
+                    📁 Upload Photo / Video
+                </button>
+                <button id="tabLive" class="py-2.5 px-4 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800">
+                    📹 Live Camera Test
+                </button>
+            </div>
+
+            <!-- Control Bar (Changes based on selected tab) -->
+            <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+                
+                <!-- Upload Controls -->
+                <div id="uploadControls" class="flex flex-wrap items-center gap-3 w-full justify-between">
+                    <input type="file" id="fileInput" accept="image/*,video/*" class="text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer">
+                    <button id="scanUploadBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-6 rounded-lg text-sm transition shadow-lg">
+                        ▶ Start AI Detection
+                    </button>
+                </div>
+
+                <!-- Live Camera Controls -->
+                <div id="liveControls" class="hidden flex-wrap items-center gap-3 w-full justify-between">
+                    <div class="flex items-center gap-2">
+                        <button id="startCamBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-5 rounded-lg text-sm transition">
+                            🎥 Start Live Camera
+                        </button>
+                        <button id="stopCamBtn" class="hidden bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-5 rounded-lg text-sm transition">
+                            ⏹ Stop Camera
+                        </button>
+                    </div>
+                    <button id="flipCamBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold py-2 px-4 rounded-lg text-sm border border-slate-700 transition">
+                        🔄 Flip Camera (Front/Back)
+                    </button>
+                </div>
+            </div>
+
+            <!-- AI Viewport (Video / Image + Moving Bounding Box Canvas Overlay) -->
+            <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl flex flex-col items-center justify-center min-h-[360px] relative p-2">
+                
+                <!-- Placeholder when nothing is loaded -->
+                <div id="emptyState" class="text-center p-8 text-slate-500">
+                    <div class="text-5xl mb-3">🎯</div>
+                    <p class="font-bold text-slate-300 text-lg">AI Vision Viewport Ready</p>
+                    <p class="text-sm mt-1">Upload a photo/video or start Live Camera to track emergency vehicles with real-time green bounding boxes.</p>
+                </div>
+
+                <!-- Media Wrapper: Keeps Video/Image and Canvas 100% locked together -->
+                <div id="mediaWrapper" class="relative w-full hidden">
+                    <img id="imageElement" class="w-full h-auto block rounded-xl hidden" />
+                    <video id="videoElement" class="w-full h-auto block rounded-xl hidden" playsinline muted loop controls></video>
+                    <!-- Overlay Canvas for Green Bounding Boxes -->
+                    <canvas id="overlayCanvas" class="absolute inset-0 w-full h-full pointer-events-none"></canvas>
+                </div>
+
+            </div>
+
+            <!-- Live Telemetry Metrics -->
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 text-center">
+                    <p class="text-xs text-slate-400 uppercase font-semibold">Detected Vehicles</p>
+                    <p id="metricCount" class="text-2xl md:text-3xl font-extrabold text-emerald-400 mt-1">0</p>
+                </div>
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 text-center">
+                    <p class="text-xs text-slate-400 uppercase font-semibold">Peak Confidence</p>
+                    <p id="metricConf" class="text-2xl md:text-3xl font-extrabold text-cyan-400 mt-1">0%</p>
+                </div>
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 text-center">
+                    <p class="text-xs text-slate-400 uppercase font-semibold">AI Scan Speed</p>
+                    <p id="metricSpeed" class="text-2xl md:text-3xl font-extrabold text-purple-400 mt-1">-- ms</p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Traffic Signal & Live Event Log -->
+        <div class="flex flex-col gap-6">
+
+            <!-- Traffic Signal Status Card -->
+            <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 flex flex-col items-center text-center shadow-xl">
+                <h2 class="text-sm font-bold uppercase tracking-widest text-slate-400 mb-4">Traffic Signal Controller</h2>
+                
+                <!-- 3-Light Traffic Housing -->
+                <div class="bg-slate-950 p-5 rounded-3xl border-2 border-slate-800 flex flex-col gap-4 shadow-inner">
+                    <div id="redLight" class="w-16 h-16 rounded-full bg-red-600 shadow-[0_0_25px_#dc2626] transition-all duration-300"></div>
+                    <div id="yellowLight" class="w-16 h-16 rounded-full bg-slate-800 transition-all duration-300"></div>
+                    <div id="greenLight" class="w-16 h-16 rounded-full bg-slate-800 transition-all duration-300"></div>
+                </div>
+
+                <!-- Dynamic Status Banner -->
+                <div id="signalBanner" class="mt-6 w-full py-3 px-4 rounded-xl bg-red-950/50 border border-red-800 text-red-400 font-bold text-lg tracking-wide transition-all">
+                    🛑 NORMAL TRAFFIC (RED)
+                </div>
+                <p id="signalSubtext" class="text-xs text-slate-400 mt-2">
+                    Waiting for emergency vehicle detection...
+                </p>
+            </div>
+
+            <!-- Live Detection Terminal Log -->
+            <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 flex-1 flex flex-col">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-xs font-bold uppercase tracking-widest text-slate-400">Live Detection Log</h2>
+                    <button id="clearLogBtn" class="text-xs text-slate-500 hover:text-slate-300">Clear</button>
+                </div>
+                <div id="logContainer" class="bg-slate-950 rounded-xl p-3 font-mono text-xs text-slate-300 h-56 overflow-y-auto flex flex-col gap-1.5 border border-slate-800/80">
+                    <div class="text-slate-500">[SYSTEM] ClearPath AI Vision Engine Ready.</div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Offscreen Canvas for extracting frames to send to Backend -->
+    <canvas id="captureCanvas" class="hidden"></canvas>
+
+    <script>
+        // --- DOM Elements ---
+        const tabUpload = document.getElementById('tabUpload');
+        const tabLive = document.getElementById('tabLive');
+        const uploadControls = document.getElementById('uploadControls');
+        const liveControls = document.getElementById('liveControls');
+
+        const fileInput = document.getElementById('fileInput');
+        const scanUploadBtn = document.getElementById('scanUploadBtn');
+        const startCamBtn = document.getElementById('startCamBtn');
+        const stopCamBtn = document.getElementById('stopCamBtn');
+        const flipCamBtn = document.getElementById('flipCamBtn');
+
+        const emptyState = document.getElementById('emptyState');
+        const mediaWrapper = document.getElementById('mediaWrapper');
+        const imageElement = document.getElementById('imageElement');
+        const videoElement = document.getElementById('videoElement');
+        const overlayCanvas = document.getElementById('overlayCanvas');
+        const overlayCtx = overlayCanvas.getContext('2d');
+        const captureCanvas = document.getElementById('captureCanvas');
+        const captureCtx = captureCanvas.getContext('2d');
+
+        const redLight = document.getElementById('redLight');
+        const yellowLight = document.getElementById('yellowLight');
+        const greenLight = document.getElementById('greenLight');
+        const signalBanner = document.getElementById('signalBanner');
+        const signalSubtext = document.getElementById('signalSubtext');
+
+        const metricCount = document.getElementById('metricCount');
+        const metricConf = document.getElementById('metricConf');
+        const metricSpeed = document.getElementById('metricSpeed');
+        const logContainer = document.getElementById('logContainer');
+        const clearLogBtn = document.getElementById('clearLogBtn');
+
+        const sirenToggleBtn = document.getElementById('sirenToggleBtn');
+        const sirenIcon = document.getElementById('sirenIcon');
+        const sirenBtnText = document.getElementById('sirenBtnText');
+        const sirenActiveBadge = document.getElementById('sirenActiveBadge');
+
+        // --- State Variables ---
+        let currentMode = 'upload'; // 'upload' or 'live'
+        let isScanning = false;
+        let mediaStream = null;
+        let useFrontCamera = false;
+
+        // --- Web Audio API Synthesizer Siren (No external MP3 needed) ---
+        let audioCtx = null;
+        let sirenOsc = null;
+        let sirenGain = null;
+        let sirenInterval = null;
+        let isSirenEnabled = true; // User Master Toggle
+        let isSirenPlaying = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function startSirenSound() {
+            if (!isSirenEnabled || isSirenPlaying) return;
+            initAudio();
+
+            sirenOsc = audioCtx.createOscillator();
+            sirenGain = audioCtx.createGain();
+            sirenOsc.type = 'sawtooth';
+            sirenOsc.frequency.setValueAtTime(650, audioCtx.currentTime);
+            sirenGain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+
+            sirenOsc.connect(sirenGain);
+            sirenGain.connect(audioCtx.destination);
+            sirenOsc.start();
+
+            let highPitch = true;
+            sirenInterval = setInterval(() => {
+                if (!sirenOsc || !audioCtx) return;
+                const targetFreq = highPitch ? 1150 : 650;
+                sirenOsc.frequency.exponentialRampToValueAtTime(targetFreq, audioCtx.currentTime + 0.35);
+                highPitch = !highPitch;
+            }, 400);
+
+            isSirenPlaying = true;
+            sirenActiveBadge.classList.remove('hidden');
+            sirenActiveBadge.classList.add('flex');
+        }
+
+        function stopSirenSound() {
+            if (!isSirenPlaying) return;
+            clearInterval(sirenInterval);
+            if (sirenOsc) {
+                try { sirenOsc.stop(); sirenOsc.disconnect(); } catch (e) {}
+                sirenOsc = null;
+            }
+            isSirenPlaying = false;
+            sirenActiveBadge.classList.add('hidden');
+            sirenActiveBadge.classList.remove('flex');
+        }
+
+        // User On/Off Siren Toggle Button
+        sirenToggleBtn.addEventListener('click', () => {
+            initAudio();
+            isSirenEnabled = !isSirenEnabled;
+            if (isSirenEnabled) {
+                sirenIcon.textContent = '🔔';
+                sirenBtnText.textContent = 'Siren: ON';
+                sirenToggleBtn.className = "flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition shadow-lg";
+                addLog("Siren audio enabled by user.");
+            } else {
+                stopSirenSound();
+                sirenIcon.textContent = '🔕';
+                sirenBtnText.textContent = 'Siren: OFF';
+                sirenToggleBtn.className = "flex items-center gap-2 bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-lg text-sm font-bold transition";
+                addLog("Siren audio muted by user.");
+            }
+        });
+
+        // --- Logging Helper ---
+        function addLog(message, isEmergency = false) {
+            const time = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = isEmergency ? "text-emerald-400 font-bold" : "text-slate-400";
+            div.textContent = `[${time}] ${message}`;
+            logContainer.prepend(div);
+        }
+
+        clearLogBtn.addEventListener('click', () => {
+            logContainer.innerHTML = '';
+        });
+
+        // --- Mode Switching ---
+        tabUpload.addEventListener('click', () => {
+            stopEverything();
+            currentMode = 'upload';
+            tabUpload.className = "py-2.5 px-4 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 bg-blue-600 text-white shadow-lg";
+            tabLive.className = "py-2.5 px-4 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800";
+            uploadControls.classList.remove('hidden');
+            uploadControls.classList.add('flex');
+            liveControls.classList.add('hidden');
+            liveControls.classList.remove('flex');
+        });
+
+        tabLive.addEventListener('click', () => {
+            stopEverything();
+            currentMode = 'live';
+            tabLive.className = "py-2.5 px-4 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 bg-blue-600 text-white shadow-lg";
+            tabUpload.className = "py-2.5 px-4 rounded-lg font-bold text-sm transition flex items-center justify-center gap-2 text-slate-400 hover:text-white hover:bg-slate-800";
+            liveControls.classList.remove('hidden');
+            liveControls.classList.add('flex');
+            uploadControls.classList.add('hidden');
+            uploadControls.classList.remove('flex');
+        });
+
+        function stopEverything() {
+            isScanning = false;
+            stopSirenSound();
+            clearOverlay();
+            setTrafficLight(false);
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+            }
+            videoElement.pause();
+            videoElement.srcObject = null;
+            videoElement.src = "";
+            startCamBtn.classList.remove('hidden');
+            stopCamBtn.classList.add('hidden');
+        }
+
+        // --- File Upload Handling ---
+        fileInput.addEventListener('change', function() {
+            stopEverything();
+            const file = this.files[0];
+            if (!file) return;
+
+            emptyState.classList.add('hidden');
+            mediaWrapper.classList.remove('hidden');
+            const url = URL.createObjectURL(file);
+
+            if (file.type.startsWith('video/')) {
+                imageElement.classList.add('hidden');
+                videoElement.classList.remove('hidden');
+                videoElement.src = url;
+                addLog(`Loaded video: ${file.name}`);
+            } else {
+                videoElement.classList.add('hidden');
+                imageElement.classList.remove('hidden');
+                imageElement.src = url;
+                addLog(`Loaded photo: ${file.name}`);
+            }
+        });
+
+        scanUploadBtn.addEventListener('click', async () => {
+            initAudio();
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("Please select an image or video file first.");
+                return;
+            }
+
+            if (file.type.startsWith('video/')) {
+                isScanning = true;
+                videoElement.play();
+                addLog("Started real-time AI video frame tracking...");
+                scanVideoLoop();
+            } else {
+                addLog("Scanning photo for emergency vehicles...");
+                await scanSingleElement(imageElement);
+            }
+        });
+
+        // Stop scanning if uploaded video is paused or ended
+        videoElement.addEventListener('pause', () => {
+            if (currentMode === 'upload') {
+                isScanning = false;
+                stopSirenSound();
+            }
+        });
+
+        // --- Live Camera Handling ---
+        async function startCamera() {
+            initAudio();
+            stopEverything();
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: useFrontCamera ? "user" : "environment",
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    },
+                    audio: false
+                };
+                mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+                emptyState.classList.add('hidden');
+                mediaWrapper.classList.remove('hidden');
+                imageElement.classList.add('hidden');
+                videoElement.classList.remove('hidden');
+                videoElement.controls = false;
+                videoElement.srcObject = mediaStream;
+                await videoElement.play();
+
+                startCamBtn.classList.add('hidden');
+                stopCamBtn.classList.remove('hidden');
+                isScanning = true;
+                addLog(`Live Camera started (${useFrontCamera ? 'Front' : 'Rear'} Camera)`);
+                scanVideoLoop();
+            } catch (err) {
+                console.error(err);
+                alert("Camera access denied! Please ensure you are using an HTTPS connection and have granted camera permissions.");
+            }
+        }
+
+        startCamBtn.addEventListener('click', startCamera);
+        stopCamBtn.addEventListener('click', stopEverything);
+        flipCamBtn.addEventListener('click', () => {
+            useFrontCamera = !useFrontCamera;
+            if (mediaStream) startCamera();
+        });
+
+        // --- Core Frame Extraction & AI Loop ---
+        async function scanVideoLoop() {
+            while (isScanning && !videoElement.paused && !videoElement.ended) {
+                await scanSingleElement(videoElement);
+                // Short delay to keep browser UI responsive
+                await new Promise(r => setTimeout(r, 120));
+            }
+        }
+
+        async function scanSingleElement(mediaEl) {
+            const width = mediaEl.videoWidth || mediaEl.naturalWidth;
+            const height = mediaEl.videoHeight || mediaEl.naturalHeight;
+            if (!width || !height) return;
+
+            // Compress frame to max 640px width for fast network speed
+            const scale = Math.min(1, 640 / width);
+            captureCanvas.width = Math.round(width * scale);
+            captureCanvas.height = Math.round(height * scale);
+            captureCtx.drawImage(mediaEl, 0, 0, captureCanvas.width, captureCanvas.height);
+
+            const blob = await new Promise(resolve => captureCanvas.toBlob(resolve, 'image/jpeg', 0.8));
+            if (!blob) return;
+
+            const formData = new FormData();
+            formData.append('file', blob, 'frame.jpg');
+
+            const startTime = performance.now();
+            try {
+                const res = await fetch('/detect', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                const latency = Math.round(performance.now() - startTime);
+
+                // Update UI only if we are still active (or if it's a static photo)
+                if (isScanning || mediaEl === imageElement) {
+                    drawGreenBoxes(data.boxes, mediaEl);
+                    updateDashboardState(data.emergency_detected, data.boxes, latency);
+                }
+            } catch (err) {
+                console.error("Frame scan error:", err);
+            }
+        }
+
+        // --- Draw Moving Green Bounding Boxes ---
+        function clearOverlay() {
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+        }
+
+        function drawGreenBoxes(boxes, mediaEl) {
+            overlayCanvas.width = mediaEl.clientWidth;
+            overlayCanvas.height = mediaEl.clientHeight;
+            overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+            if (!boxes || boxes.length === 0) return;
+
+            boxes.forEach(box => {
+                const x = box.x1 * overlayCanvas.width;
+                const y = box.y1 * overlayCanvas.height;
+                const w = (box.x2 - box.x1) * overlayCanvas.width;
+                const h = (box.y2 - box.y1) * overlayCanvas.height;
+
+                // Glowing Green Bounding Box
+                overlayCtx.strokeStyle = '#22c55e';
+                overlayCtx.lineWidth = 3.5;
+                overlayCtx.shadowColor = '#22c55e';
+                overlayCtx.shadowBlur = 12;
+                overlayCtx.strokeRect(x, y, w, h);
+
+                // Reset shadow for text label
+                overlayCtx.shadowBlur = 0;
+
+                // Label Background Pill
+                const labelText = `🚨 ${box.label} (${box.confidence}%)`;
+                overlayCtx.font = 'bold 13px sans-serif';
+                const textWidth = overlayCtx.measureText(labelText).width;
+                const labelY = y > 28 ? y - 28 : y;
+
+                overlayCtx.fillStyle = '#16a34a';
+                overlayCtx.fillRect(x, labelY, textWidth + 14, 26);
+
+                // Label Text
+                overlayCtx.fillStyle = '#ffffff';
+                overlayCtx.fillText(labelText, x + 7, labelY + 18);
+            });
+        }
+
+        // --- Update Traffic Light, Siren & Telemetry ---
+        let lastDetectedState = false;
+
+        function updateDashboardState(detected, boxes, latency) {
+            metricSpeed.textContent = `${latency} ms`;
+            metricCount.textContent = boxes ? boxes.length : 0;
+
+            if (boxes && boxes.length > 0) {
+                const maxConf = Math.max(...boxes.map(b => b.confidence));
+                metricConf.textContent = `${maxConf}%`;
+            } else {
+                metricConf.textContent = `0%`;
+            }
+
+            setTrafficLight(detected);
+
+            if (detected) {
+                startSirenSound();
+                if (!lastDetectedState) {
+                    addLog(`🚨 EMERGENCY VEHICLE DETECTED! Green Corridor Activated.`, true);
+                }
+            } else {
+                stopSirenSound();
+                if (lastDetectedState) {
+                    addLog(`Path clear. Reverted to normal traffic signal.`);
+                }
+            }
+            lastDetectedState = detected;
+        }
+
+        function setTrafficLight(isGreen) {
+            if (isGreen) {
+                redLight.className = "w-16 h-16 rounded-full bg-slate-800 transition-all duration-300";
+                greenLight.className = "w-16 h-16 rounded-full bg-emerald-500 shadow-[0_0_30px_#10b981] transition-all duration-300";
+                signalBanner.className = "mt-6 w-full py-3 px-4 rounded-xl bg-emerald-950/60 border border-emerald-500 text-emerald-400 font-extrabold text-lg tracking-wide transition-all";
+                signalBanner.textContent = "🟢 GREEN CORRIDOR ACTIVE";
+                signalSubtext.textContent = "Emergency vehicle detected! Clearing traffic lane immediately.";
+            } else {
+                redLight.className = "w-16 h-16 rounded-full bg-red-600 shadow-[0_0_25px_#dc2626] transition-all duration-300";
+                greenLight.className = "w-16 h-16 rounded-full bg-slate-800 transition-all duration-300";
+                signalBanner.className = "mt-6 w-full py-3 px-4 rounded-xl bg-red-950/50 border border-red-800 text-red-400 font-bold text-lg tracking-wide transition-all";
+                signalBanner.textContent = "🛑 NORMAL TRAFFIC (RED)";
+                signalSubtext.textContent = "No emergency vehicle in frame.";
+            }
+        }
+    </script>
+</body>
+</html>
