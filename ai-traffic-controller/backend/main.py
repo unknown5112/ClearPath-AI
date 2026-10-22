@@ -1,13 +1,26 @@
+import modal
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from ultralytics import YOLO
 import cv2
 import numpy as np
 
-app = FastAPI()
+# 1. Modal App aur Cloud Environment banayenge
+app = modal.App("clearpath-ai-backend")
 
-app.add_middleware(
+# 2. Cloud Server setup: Libraries install karna aur GitHub se best.pt model download karna
+# Note: Cloud par libGL error na aaye, isliye 'opencv-python-headless' use karna zaroori hai
+image = (
+    modal.Image.debian_slim()
+    .pip_install("fastapi", "uvicorn", "ultralytics", "opencv-python-headless", "python-multipart")
+    .apt_install("wget")
+    .run_commands("wget https://raw.githubusercontent.com/unknown5112/ClearPath-AI/main/ai-traffic-controller/backend/best.pt")
+)
+
+# 3. Tera original FastAPI setup (Modal ke app se alag rakhne ke liye iska naam 'web_app' diya hai)
+web_app = FastAPI()
+
+web_app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Sabhi websites ko allow karega
     allow_credentials=True,
@@ -18,11 +31,11 @@ app.add_middleware(
 # Load the trained YOLOv8 model
 model = YOLO("best.pt")
 
-@app.get("/")
+@web_app.get("/")
 def read_root():
-    return FileResponse("../frontend/index.html")
+    return {"message": "ClearPath AI Backend is permanently live on Modal 🚀"}
 
-@app.post("/detect")
+@web_app.post("/detect")
 async def detect_emergency(file: UploadFile = File(...)):
     # Read frame directly in memory (RAM) for low-latency processing
     contents = await file.read()
@@ -67,3 +80,9 @@ async def detect_emergency(file: UploadFile = File(...)):
         "emergency_detected": emergency_detected,
         "boxes": boxes_list
     }
+
+# 4. Modal ko batana ki is FastAPI app ko cloud par run karna hai
+@app.function(image=image)
+@modal.asgi_app()
+def fastapi_app():
+    return web_app
