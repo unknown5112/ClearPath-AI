@@ -5,7 +5,7 @@
 ## 📌 Overview
 **ClearPath AI** is a real-time computer vision system designed to optimize urban traffic flow for emergency vehicles. By detecting Ambulances, Fire Trucks, and Police cars in real-time, it acts as the brain for adaptive traffic signals, ensuring clear pathways for first responders and reducing critical response times.
 
-**🚀 Live Demo:** [Insert your Vercel Link Here]
+***🚀 Live Demo:** https://clearpath-ai-frontend.vercel.app*
 
 ## 🛠️ Tech Stack & Architecture
 
