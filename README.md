@@ -1,7 +1,5 @@
 # 🚨 ClearPath AI: Smart Traffic Command Center
 
-![ClearPath AI Banner](https://via.placeholder.com/1000x300?text=ClearPath+AI+-+Smart+Traffic+Command+Center)
-
 ## 📌 Overview
 **ClearPath AI** is a real-time computer vision system designed to optimize urban traffic flow for emergency vehicles. By detecting Ambulances, Fire Trucks, and Police cars in real-time, it acts as the brain for adaptive traffic signals, ensuring clear pathways for first responders and reducing critical response times.
 
