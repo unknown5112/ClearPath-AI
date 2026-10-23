@@ -57,5 +57,6 @@
 
 ## 🤝 Connect with the Developer
 Built with ☕ and late-night debugging. 
-Let's connect and discuss AI, Cloud Architecture, and scalable systems! <br> 
+Let's connect and discuss AI, Cloud Architecture, and scalable systems!
+
 *[LinkedIn Profile](https://www.linkedin.com/in/vishesh-choudhary-737437441?utm_source=share_via&utm_content=profile&utm_medium=member_android)*
